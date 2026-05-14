@@ -7,7 +7,7 @@ app = Flask(__name__)
 # ===== НАСТРОЙКИ TELEGRAM (ЗАМЕНИ НА СВОИ!) =====
 TELEGRAM_BOT_TOKEN = "8634619027:AAGx24rMqSYjiUEPgnlovkrS8Dffe4LGZyU"  # Вставь сюда токен
 TELEGRAM_CHAT_ID = "720615262"              # Вставь сюда свой ID
-SECRET = "T1P1OT4BHCMWppsY7GGGdSOVJaNjA1iDIsUO"                     # Пароль для проверки сигнала
+SECRET = "my_secret_2025"                     # Пароль для проверки сигнала
 
 # ===== ФУНКЦИЯ ОТПРАВКИ В TELEGRAM =====
 def send_telegram(message):
