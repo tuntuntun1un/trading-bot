@@ -24,8 +24,8 @@ SECRET = "my_secret_2025"
 def get_exchange():
     if USE_TESTNET:
         return ccxt.bybit({
-            'apiKey': 'твой_тестнет_api_ключ',
-            'secret': 'твой_тестнет_секрет',
+            'apiKey': '0NGmuZYb5Bescwkahq',
+            'secret': 'T1P1OT4BHCMWppsY7GGGdSOVJaNjA1iDIsUO',
             'enableRateLimit': True,
             'options': {'defaultType': 'future', 'leverage': 1},
             'urls': {
