@@ -32,9 +32,9 @@ def webhook():
         print(f"📡 Получен сигнал: {data}")
 
         # Проверяем секретный пароль
-        if data.get('secret') != SECRET:
+        #if data.get('secret') != SECRET:
             print("❌ Неверный секрет!")
-            return jsonify({"error": "Unauthorized"}), 401
+            #return jsonify({"error": "Unauthorized"}), 401
 
         # Извлекаем сигнал и цену
         signal = data.get('signal')
