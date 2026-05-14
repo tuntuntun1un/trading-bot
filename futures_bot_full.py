@@ -5,8 +5,8 @@ from flask import Flask, request, jsonify
 app = Flask(__name__)
 
 # ===== НАСТРОЙКИ TELEGRAM (ЗАМЕНИ НА СВОИ) =====
-TELEGRAM_BOT_TOKEN = "8120661225:AAFzaTzBrfCqjZA2jMmA0bs9zeoDmA0lObA"
-TELEGRAM_CHAT_ID = "8398600924"
+TELEGRAM_BOT_TOKEN = "8634619027:AAGx24rMqSYjiUEPgnlovkrS8Dffe4LGZyU"
+TELEGRAM_CHAT_ID = "720615262"
 SECRET = "my_secret_2025"
 
 def send_telegram(message):
