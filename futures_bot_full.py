@@ -21,6 +21,7 @@ def get_exchange():
         'enableRateLimit': True,
         'options': {
             'defaultType': 'linear',  # USDT-фьючерсы
+            'adjustForTimeDifference': True,  # <- КЛЮЧЕВОЙ ПАРАМЕТР ДЛЯ ТЕСТНЕТА
         },
     })
     # Принудительно устанавливаем режим тестовой сети
@@ -28,6 +29,13 @@ def get_exchange():
     return exchange
 
 exchange = get_exchange()
+
+# Принудительная синхронизация времени при запуске
+try:
+    exchange.load_time_difference()
+    print(f"✅ Разница во времени синхронизирована: {exchange.time_difference} мс")
+except Exception as e:
+    print(f"⚠️ Ошибка синхронизации времени: {e}")
 
 def get_position_size(price):
     try:
