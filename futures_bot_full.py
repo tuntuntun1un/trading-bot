@@ -1,57 +1,42 @@
-import ccxt
+import requests
 import json
+import time
+import hashlib
+import hmac
 from flask import Flask, request, jsonify
 
 app = Flask(__name__)
 
 # ========== НАСТРОЙКИ ==========
-SYMBOL = "XRP/USDT"
 SECRET = "my_secret_2025"
 RISK_PERCENT = 1.0
 STOP_LOSS_PERCENT = 1.5
 
-# ========== ТВОИ API-КЛЮЧИ ==========
+# ========== API-КЛЮЧИ ДЛЯ ТЕСТНЕТА ==========
 API_KEY = "0NGmuZYb5Bescwkahq"
 API_SECRET = "T1P10T4BHCMWppS7GGGdSOVJajNja1iDiIsUO"
 
-def get_exchange():
-    exchange = ccxt.bybit({
-        'apiKey': API_KEY,
-        'secret': API_SECRET,
-        'enableRateLimit': True,
-        'options': {
-            'defaultType': 'linear',  # USDT-фьючерсы
-            'adjustForTimeDifference': True,  # <- КЛЮЧЕВОЙ ПАРАМЕТР ДЛЯ ТЕСТНЕТА
-        },
-    })
-    # Принудительно устанавливаем режим тестовой сети
-    exchange.set_sandbox_mode(True)
-    return exchange
+# Базовый URL для тестовой сети Bybit
+BASE_URL = "https://api-testnet.bybit.com"
 
-exchange = get_exchange()
+# Параметры торговли
+SYMBOL = "XRPUSDT"  # Без слеша для API Bybit
+SIDE = "Buy"        # Buy или Sell
+ORDER_TYPE = "Market"
 
-# Принудительная синхронизация времени при запуске
-try:
-    exchange.load_time_difference()
-    print(f"✅ Разница во времени синхронизирована: {exchange.time_difference} мс")
-except Exception as e:
-    print(f"⚠️ Ошибка синхронизации времени: {e}")
+def generate_signature(params, secret):
+    """Генерация подписи для Bybit"""
+    param_str = '&'.join([f"{k}={v}" for k, v in sorted(params.items())])
+    signature = hmac.new(bytes(secret, 'utf-8'), bytes(param_str, 'utf-8'), hashlib.sha256).hexdigest()
+    return signature
 
-def get_position_size(price):
-    try:
-        balance = exchange.fetch_balance()
-        usdt = balance['USDT']['free']
-        risk_usdt = usdt * (RISK_PERCENT / 100)
-        stop_distance = price * (STOP_LOSS_PERCENT / 100)
-        size = risk_usdt / stop_distance
-        return round(size, 1)
-    except Exception as e:
-        print(f"Ошибка расчета: {e}")
-        return 10.0
+def get_position_size():
+    """Получение размера позиции (фиксированный для теста)"""
+    return 10  # 10 XRP для теста
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
-    print("🔥 Webhook вызван!")  # Важный маркер в логах
+    print("🔥 Webhook вызван!")
     try:
         data = request.get_json()
         print(f"📡 Данные: {data}")
@@ -65,28 +50,62 @@ def webhook():
         if signal not in ['buy', 'sell']:
             return jsonify({"error": "Invalid signal"}), 400
 
-        amount = get_position_size(price)
-        if amount < 1:
-            return jsonify({"error": "Amount too small"}), 400
+        # Определяем сторону сделки
+        side = "Buy" if signal == 'buy' else "Sell"
+        
+        amount = get_position_size()
+        print(f"🚀 Открываем {side} {amount} XRP по цене {price}")
 
-        print(f"🚀 Открываем {signal.upper()} {amount} XRP по цене {price}")
-        
-        if signal == 'buy':
-            order = exchange.create_market_buy_order(SYMBOL, amount)
-            stop_price = round(price * (1 - STOP_LOSS_PERCENT / 100), 4)
-            exchange.create_order(SYMBOL, 'stop_market', 'sell', amount, None, {'stopPrice': stop_price})
+        # --- Формируем запрос к Bybit ---
+        timestamp = int(time.time() * 1000)
+        params = {
+            'category': 'linear',
+            'symbol': SYMBOL,
+            'side': side,
+            'orderType': 'Market',
+            'qty': str(amount),
+            'timeInForce': 'GTC',
+            'timestamp': timestamp,
+            'api_key': API_KEY,
+        }
+
+        # Добавляем подпись
+        params['sign'] = generate_signature(params, API_SECRET)
+
+        # Отправляем запрос
+        response = requests.post(f"{BASE_URL}/v5/order/create", data=params)
+        result = response.json()
+
+        print(f"Ответ Bybit: {result}")
+
+        if result.get('retCode') == 0:
+            print(f"✅ Сделка исполнена! Order ID: {result['result']['orderId']}")
+            
+            # Устанавливаем стоп-лосс
+            stop_price = round(price * (1 - STOP_LOSS_PERCENT / 100), 4) if signal == 'buy' else round(price * (1 + STOP_LOSS_PERCENT / 100), 4)
+            stop_params = {
+                'category': 'linear',
+                'symbol': SYMBOL,
+                'side': 'Sell' if signal == 'buy' else 'Buy',
+                'orderType': 'Market',
+                'qty': str(amount),
+                'stopPx': str(stop_price),
+                'timestamp': int(time.time() * 1000),
+                'api_key': API_KEY,
+            }
+            stop_params['sign'] = generate_signature(stop_params, API_SECRET)
+            stop_response = requests.post(f"{BASE_URL}/v5/order/create", data=stop_params)
+            print(f"Стоп-лосс: {stop_response.json()}")
+            
+            return jsonify({"status": "ok"}), 200
         else:
-            order = exchange.create_market_sell_order(SYMBOL, amount)
-            stop_price = round(price * (1 + STOP_LOSS_PERCENT / 100), 4)
-            exchange.create_order(SYMBOL, 'stop_market', 'buy', amount, None, {'stopPrice': stop_price})
-        
-        print(f"✅ Сделка исполнена! Стоп на {stop_price}")
-        return jsonify({"status": "ok"}), 200
+            print(f"❌ Ошибка Bybit: {result}")
+            return jsonify({"error": result}), 500
 
     except Exception as e:
         print(f"❌ КРИТИЧЕСКАЯ ОШИБКА: {e}")
         return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
-    print("🚀 ТОРГОВЫЙ БОТ (TESTNET) ЗАПУЩЕН!")
+    print("🚀 ТОРГОВЫЙ БОТ (ПРЯМОЙ API) ЗАПУЩЕН!")
     app.run(host='0.0.0.0', port=5002)
