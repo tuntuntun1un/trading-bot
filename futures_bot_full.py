@@ -10,8 +10,8 @@ RISK_PERCENT = 1.0
 SYMBOL = "XRPUSDT"  # Формат для Bybit
 
 # ========== API-КЛЮЧИ ДЛЯ ТЕСТНЕТА ==========
-API_KEY = "0NGmuZYb5Bescwkahq"
-API_SECRET = "T1P10T4BHCMWppS7GGGdSOVJajNja1iDiIsUO"
+API_KEY = "bwd7nW3S4L868hLd67"
+API_SECRET = "79yRETq6nAo2dEeKptxghAxz7utdCdIYrqUf"
 
 # Подключение к тестовой сети Bybit
 session = HTTP(
