@@ -9,17 +9,17 @@ app = Flask(__name__)
 
 # ========== НАСТРОЙКИ ==========
 SECRET_KEY = "my_secret_2025"
-SYMBOL = "XRPUSDT"  # Формат для Bybit
+SYMBOL = "XRPUSDT"
+RECV_WINDOW = "5000"  # Обязательный параметр!
 
-# ========== ВАШ API-КЛЮЧ (СОЗДАННЫЙ СИСТЕМОЙ) ==========
+# ========== ВАШ API-КЛЮЧ ==========
 API_KEY = "bwd7nW3S4L868hLd67"
 API_SECRET = "79yRETq6nAo2dEeKptxghAxz7utdCdIYrqUf"
 
-# Базовый URL для тестовой сети Bybit
 BASE_URL = "https://api-testnet.bybit.com"
 
 def generate_signature(params, secret):
-    """Генерация подписи строго по документации Bybit."""
+    """Генерация подписи с обязательным recv_window."""
     # 1. Отсортировать параметры по ключу
     sorted_params = sorted(params.items())
     # 2. Объединить в строку "key=value&key2=value2"
@@ -36,7 +36,7 @@ def place_order(side):
     """Отправка ордера на Bybit Testnet."""
     timestamp = int(time.time() * 1000)
     
-    # Параметры ордера
+    # Параметры ордера (все значения строковые)
     order_params = {
         'category': 'linear',
         'symbol': SYMBOL,
@@ -44,9 +44,10 @@ def place_order(side):
         'orderType': 'Market',
         'qty': '10',
         'timeInForce': 'GTC',
+        'recv_window': RECV_WINDOW,   # КЛЮЧЕВОЙ ПАРАМЕТР
     }
     
-    # Параметры для подписи (включая api_key и timestamp)
+    # Параметры для подписи
     sign_params = {
         'api_key': API_KEY,
         'timestamp': str(timestamp),
@@ -56,8 +57,8 @@ def place_order(side):
     # Генерация подписи
     sign_params['sign'] = generate_signature(sign_params, API_SECRET)
     
-    # Отправка запроса
-    response = requests.post(f"{BASE_URL}/v5/order/create", data=sign_params)
+    # Отправка запроса (используем json, а не data)
+    response = requests.post(f"{BASE_URL}/v5/order/create", json=sign_params)
     return response.json()
 
 @app.route('/webhook', methods=['POST'])
@@ -88,9 +89,9 @@ def webhook():
             return jsonify({"error": result}), 500
 
     except Exception as e:
-        print(f"❌ КРИТИЧЕСКАЯ ОШИБКА: {e}")
+        print(f"❌ ОШИБКА: {e}")
         return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
-    print("🚀 БОТ (ИСПРАВЛЕННЫЙ) ЗАПУЩЕН!")
+    print("🚀 БОТ (FINAL) ЗАПУЩЕН!")
     app.run(host='0.0.0.0', port=5002)
