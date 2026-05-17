@@ -1,28 +1,64 @@
+import requests
+import json
+import time
+import hashlib
+import hmac
 from flask import Flask, request, jsonify
-from pybit.unified_trading import HTTP
-import os
 
 app = Flask(__name__)
 
 # ========== НАСТРОЙКИ ==========
 SECRET_KEY = "my_secret_2025"
-RISK_PERCENT = 1.0
 SYMBOL = "XRPUSDT"  # Формат для Bybit
 
-# ========== API-КЛЮЧИ ДЛЯ ТЕСТНЕТА ==========
+# ========== ВАШ API-КЛЮЧ (СОЗДАННЫЙ СИСТЕМОЙ) ==========
 API_KEY = "bwd7nW3S4L868hLd67"
 API_SECRET = "79yRETq6nAo2dEeKptxghAxz7utdCdIYrqUf"
 
-# Подключение к тестовой сети Bybit
-session = HTTP(
-    testnet=True,
-    api_key=API_KEY,
-    api_secret=API_SECRET,
-)
+# Базовый URL для тестовой сети Bybit
+BASE_URL = "https://api-testnet.bybit.com"
 
-def get_position_size():
-    """Рассчитывает размер позиции (для теста берём 10 XRP)"""
-    return "10"  # pybit требует строку
+def generate_signature(params, secret):
+    """Генерация подписи строго по документации Bybit."""
+    # 1. Отсортировать параметры по ключу
+    sorted_params = sorted(params.items())
+    # 2. Объединить в строку "key=value&key2=value2"
+    param_str = '&'.join([f"{k}={v}" for k, v in sorted_params])
+    # 3. Сгенерировать HMAC-SHA256 подпись
+    signature = hmac.new(
+        bytes(secret, 'utf-8'),
+        bytes(param_str, 'utf-8'),
+        hashlib.sha256
+    ).hexdigest()
+    return signature
+
+def place_order(side):
+    """Отправка ордера на Bybit Testnet."""
+    timestamp = int(time.time() * 1000)
+    
+    # Параметры ордера
+    order_params = {
+        'category': 'linear',
+        'symbol': SYMBOL,
+        'side': side,
+        'orderType': 'Market',
+        'qty': '10',
+        'timeInForce': 'GTC',
+    }
+    
+    # Параметры для подписи (включая api_key и timestamp)
+    sign_params = {
+        'api_key': API_KEY,
+        'timestamp': str(timestamp),
+        **order_params
+    }
+    
+    # Генерация подписи
+    sign_params['sign'] = generate_signature(sign_params, API_SECRET)
+    
+    # Отправка запроса
+    response = requests.post(f"{BASE_URL}/v5/order/create", data=sign_params)
+    return response.json()
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
@@ -41,34 +77,20 @@ def webhook():
             return jsonify({"error": "Invalid signal"}), 400
 
         side = "Buy" if signal == 'buy' else "Sell"
-        qty = get_position_size()
+        print(f"🚀 Отправка ордера {side} 10 XRP по цене {price}")
+        
+        result = place_order(side)
+        print(f"✅ Ответ Bybit: {result}")
 
-        print(f"🚀 Отправка ордера {side} {qty} XRP")
-
-        # Отправка рыночного ордера
-        order = session.place_order(
-            category="linear",
-            symbol=SYMBOL,
-            side=side,
-            orderType="Market",
-            qty=qty,
-            timeInForce="GTC"
-        )
-
-        print(f"Ответ Bybit: {order}")
-
-        if order.get('retCode') == 0:
-            print(f"✅ Сделка исполнена! Order ID: {order['result']['orderId']}")
-            # В реальном боте здесь должен быть код для установки стоп-лосса
-            return jsonify({"status": "ok"}), 200
+        if result.get('retCode') == 0:
+            return jsonify({"status": "ok", "orderId": result['result']['orderId']}), 200
         else:
-            print(f"❌ Ошибка Bybit: {order}")
-            return jsonify({"error": order}), 500
+            return jsonify({"error": result}), 500
 
     except Exception as e:
         print(f"❌ КРИТИЧЕСКАЯ ОШИБКА: {e}")
         return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
-    print("🚀 ТОРГОВЫЙ БОТ (PYBIT) ЗАПУЩЕН!")
+    print("🚀 БОТ (ИСПРАВЛЕННЫЙ) ЗАПУЩЕН!")
     app.run(host='0.0.0.0', port=5002)
