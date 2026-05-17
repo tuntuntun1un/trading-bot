@@ -1,6 +1,5 @@
 from flask import Flask, request, jsonify
 from pybit.unified_trading import HTTP
-import os
 
 app = Flask(__name__)
 
@@ -8,9 +7,9 @@ app = Flask(__name__)
 SECRET_KEY = "my_secret_2025"
 SYMBOL = "XRPUSDT"
 
-# ========== ТВОЙ API-КЛЮЧ ==========
-API_KEY = "E5t4L6W2m6xEYnq9oB"
-API_SECRET = "tjgXH9VL54blwx2yRIPbAGLnAc6v7ufDq56C"
+# ========== НОВЫЕ API-КЛЮЧИ (С НОВОГО АККАУНТА) ==========
+API_KEY = "wsWxEmJdArETIiHtPO"
+API_SECRET = "obd6q8YdyCyBw7OLKz2xpmgwS7aJyMNnifi"
 
 # Подключение к тестовой сети Bybit
 session = HTTP(
@@ -64,5 +63,5 @@ def webhook():
         return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
-    print("🚀 БОТ (PYBIT) ЗАПУЩЕН!")
+    print("🚀 БОТ (НОВЫЙ АККАУНТ) ЗАПУЩЕН!")
     app.run(host='0.0.0.0', port=5002)
