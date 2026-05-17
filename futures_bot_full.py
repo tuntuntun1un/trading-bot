@@ -1,5 +1,4 @@
 import requests
-import json
 import time
 import hashlib
 import hmac
@@ -10,60 +9,32 @@ app = Flask(__name__)
 # ========== НАСТРОЙКИ ==========
 SECRET_KEY = "my_secret_2025"
 SYMBOL = "XRPUSDT"
-
-# ========== ВАШ API-КЛЮЧ (СОЗДАННЫЙ СИСТЕМОЙ) ==========
-API_KEY = "bwd7nW3S4L868hLd67"
-API_SECRET = "79yRETq6nAo2dEeKptxghAxz7utdCdIYrqUf"
-
 BASE_URL = "https://api-testnet.bybit.com"
 
-def generate_signature(params, secret):
-    """Генерация подписи строго по документации Bybit."""
-    # 1. Отфильтровать пустые значения и отсортировать по ключу
-    filtered_params = {k: v for k, v in params.items() if v is not None and v != ""}
-    sorted_params = sorted(filtered_params.items())
-    # 2. Объединить в строку "key=value&key2=value2"
+# ========== ТВОЙ НОВЫЙ API-КЛЮЧ ==========
+API_KEY = "E5t4L6W2m6xEYnq9oB"
+API_SECRET = "tjgXH9VL54blwx2yRIPbAGLnAc6v7ufDq56C"
+
+def bybit_request(endpoint, params):
+    """Универсальная функция для подписанных запросов к Bybit Testnet."""
+    timestamp = int(time.time() * 1000)
+    params['api_key'] = API_KEY
+    params['timestamp'] = timestamp
+    params['recv_window'] = 5000
+
+    # Сортировка параметров для подписи
+    sorted_params = sorted(params.items())
     param_str = '&'.join([f"{k}={v}" for k, v in sorted_params])
-    # 3. Сгенерировать HMAC-SHA256 подпись
+    
+    # Генерация подписи
     signature = hmac.new(
-        bytes(secret, 'utf-8'),
+        bytes(API_SECRET, 'utf-8'),
         bytes(param_str, 'utf-8'),
         hashlib.sha256
     ).hexdigest()
-    return signature, param_str
-
-def place_order(side):
-    """Отправка ордера на Bybit Testnet."""
-    timestamp = int(time.time() * 1000)
     
-    # Параметры ордера
-    order_params = {
-        'category': 'linear',
-        'symbol': SYMBOL,
-        'side': side,
-        'orderType': 'Market',
-        'qty': '10',
-        'timeInForce': 'GTC',
-        'recv_window': 5000  # Цифрой, не строкой!
-    }
-    
-    # Параметры для подписи (добавляем api_key и timestamp)
-    sign_params = {
-        'api_key': API_KEY,
-        'timestamp': timestamp,  # Цифрой, не строкой!
-        **order_params
-    }
-    
-    # Генерация подписи и получение строки для отладки
-    sign, param_str = generate_signature(sign_params, API_SECRET)
-    print(f"DEBUG param_str: {param_str}")
-    print(f"DEBUG sign: {sign}")
-    
-    # Подготовка данных для отправки
-    sign_params['sign'] = sign
-    
-    # Отправка запроса
-    response = requests.post(f"{BASE_URL}/v5/order/create", data=sign_params)
+    params['sign'] = signature
+    response = requests.post(f"{BASE_URL}{endpoint}", data=params)
     return response.json()
 
 @app.route('/webhook', methods=['POST'])
@@ -85,18 +56,30 @@ def webhook():
         side = "Buy" if signal == 'buy' else "Sell"
         print(f"🚀 Отправка ордера {side} 10 XRP по цене {price}")
         
-        result = place_order(side)
+        # Параметры ордера
+        order_params = {
+            'category': 'linear',
+            'symbol': SYMBOL,
+            'side': side,
+            'orderType': 'Market',
+            'qty': '10',
+            'timeInForce': 'GTC',
+        }
+        
+        result = bybit_request('/v5/order/create', order_params)
         print(f"✅ Ответ Bybit: {result}")
 
         if result.get('retCode') == 0:
+            print(f"✅ Сделка исполнена! Order ID: {result['result']['orderId']}")
             return jsonify({"status": "ok", "orderId": result['result']['orderId']}), 200
         else:
+            print(f"❌ Ошибка Bybit: {result}")
             return jsonify({"error": result}), 500
 
     except Exception as e:
-        print(f"❌ ОШИБКА: {e}")
+        print(f"❌ КРИТИЧЕСКАЯ ОШИБКА: {e}")
         return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
-    print("🚀 БОТ (FINAL) ЗАПУЩЕН!")
+    print("🚀 ФИНАЛЬНЫЙ БОТ ЗАПУЩЕН!")
     app.run(host='0.0.0.0', port=5002)
